@@ -1,12 +1,13 @@
 package httpvcr
 
-import (
-	"net/http"
-)
+import "net/http"
+
+type Mode uint32
 
 const (
-	modeRecord = iota
-	modeReplay
+	ModeStopped Mode = iota
+	ModeRecord
+	ModeReplay
 )
 
 // RequestModifierFunc is a function that can be used to manipulate HTTP requests
@@ -14,76 +15,96 @@ const (
 // Useful for adding row-limits in integration tests.
 type RequestModifierFunc func(request *http.Request)
 
-var currentFilterMap map[string]string
-var currentRequestModifier RequestModifierFunc
-var currentMode = modeRecord
-var currentCassette *cassette
+type HTTPVCR struct {
+	options Options
 
-type roundTripper struct {
-	originalRT http.RoundTripper
+	mode            Mode
+	Cassette        *cassette
+	FilterMap       map[string]string
+	RequestModifier RequestModifierFunc
+
+	originalTransport http.RoundTripper
 }
 
-func init() {
-	http.DefaultTransport = &roundTripper{originalRT: http.DefaultTransport}
+type Options struct {
+	HTTPDefaultOverride bool
 }
 
-// Start starts a VCR session with the given cassette name.
-// Records episodes if the cassette file does not exists.
-// Otherwise plays back recorded episodes.
-func Start(cassetteName string, modFunc RequestModifierFunc) {
-	if currentCassette != nil {
-		panic("VCR: Session already started!")
+var DefaultOptions = Options{
+	HTTPDefaultOverride: true,
+}
+
+func New(cassetteName string, opts ...Options) *HTTPVCR {
+	options := DefaultOptions
+	if len(opts) > 0 {
+		options = opts[0]
 	}
 
-	currentCassette = &cassette{name: cassetteName}
-	currentRequestModifier = modFunc
-	currentFilterMap = make(map[string]string)
+	return &HTTPVCR{
+		options:   options,
+		mode:      ModeStopped,
+		Cassette:  &cassette{name: cassetteName},
+		FilterMap: make(map[string]string),
+	}
+}
 
-	if currentCassette.exists() {
-		currentMode = modeReplay
-		currentCassette.read()
+func (v *HTTPVCR) Start() {
+	if v.mode != ModeStopped {
+		panic("httpvcr: session already started!")
+	}
+
+	v.originalTransport = http.DefaultTransport
+	if v.options.HTTPDefaultOverride {
+		http.DefaultTransport = v
+	}
+
+	if v.Cassette.Exists() {
+		v.mode = ModeReplay
+		v.Cassette.read()
 	} else {
-		currentMode = modeRecord
+		v.mode = ModeRecord
 	}
 }
 
-// FilterData allows replacement of sensitive data with a dummy-string
-func FilterData(original string, replacement string) {
-	currentFilterMap[original] = replacement
-}
-
-// Stop stops the VCR session and writes the cassette file (when recording)
-func Stop() {
-	if currentMode == modeRecord {
-		currentCassette.write()
+func (v *HTTPVCR) Stop() {
+	if v.mode == ModeRecord {
+		v.Cassette.write()
 	}
+	// TODO: what happens if we stop then start again?
+	v.mode = ModeStopped
 
-	currentCassette = nil
+	if v.options.HTTPDefaultOverride {
+		http.DefaultTransport = v.originalTransport
+	}
 }
 
-func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
-	vcrReq := newVCRRequest(request, currentFilterMap)
+func (v *HTTPVCR) Mode() Mode {
+	return v.Mode()
+}
+
+func (v *HTTPVCR) RoundTrip(request *http.Request) (*http.Response, error) {
+	vcrReq := newVCRRequest(request, v.FilterMap)
 	var vcrRes *vcrResponse
 
-	if currentCassette == nil {
-		return rt.originalRT.RoundTrip(request)
+	if v.mode == ModeStopped {
+		return v.originalTransport.RoundTrip(request)
 	}
 
-	if currentRequestModifier != nil {
-		currentRequestModifier(request)
+	if v.RequestModifier != nil {
+		v.RequestModifier(request)
 	}
 
-	if currentMode == modeRecord {
-		response, err := rt.originalRT.RoundTrip(request)
+	if v.mode == ModeRecord {
+		response, err := v.originalTransport.RoundTrip(request)
 		if err != nil {
 			return nil, err
 		}
 		vcrRes = newVCRResponse(response)
 
 		e := episode{Request: vcrReq, Response: vcrRes}
-		currentCassette.Episodes = append(currentCassette.Episodes, e)
+		v.Cassette.Episodes = append(v.Cassette.Episodes, e)
 	} else {
-		e := currentCassette.matchEpisode(vcrReq)
+		e := v.Cassette.matchEpisode(vcrReq)
 		vcrRes = e.Response
 	}
 

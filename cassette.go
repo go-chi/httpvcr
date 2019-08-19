@@ -19,50 +19,43 @@ type episode struct {
 	Response *vcrResponse
 }
 
-func (c *cassette) fileName() string {
+func (c *cassette) Name() string {
+	return c.name
+}
+
+func (c *cassette) Filename() string {
 	return "fixtures/vcr/" + c.name + ".json"
 }
 
-func (c *cassette) exists() bool {
-	_, err := os.Stat(c.fileName())
+func (c *cassette) Exists() bool {
+	_, err := os.Stat(c.Filename())
 	return err == nil
 }
 
 func (c *cassette) read() {
-	jsonData, _ := ioutil.ReadFile(c.fileName())
+	jsonData, _ := ioutil.ReadFile(c.Filename())
 	err := json.Unmarshal(jsonData, c)
 	if err != nil {
-		panic("VCR: Cannot parse JSON!")
+		panic("httpvcr: cannot parse json!")
 	}
 }
 
 func (c *cassette) write() {
-	jsonData, _ := json.Marshal(currentCassette)
+	jsonData, _ := json.Marshal(c)
 
 	var jsonOut bytes.Buffer
 	json.Indent(&jsonOut, jsonData, "", "  ")
 
 	os.MkdirAll("fixtures/vcr", 0755)
-	err := ioutil.WriteFile(c.fileName(), jsonOut.Bytes(), 0644)
+	err := ioutil.WriteFile(c.Filename(), jsonOut.Bytes(), 0644)
 	if err != nil {
-		panic("VCR: Cannot write cassette file!")
+		panic("httpvcr: cannot write cassette file!")
 	}
-}
-
-func panicEpisodeMismatch(request *vcrRequest, field string, expected string, actual string) {
-	panic(fmt.Sprintf(
-		"VCR: Problem with Episode for %s %s\n  Episode %s does not match:\n  expected: %s\n  but got: %s",
-		request.Method,
-		request.URL,
-		field,
-		expected,
-		actual,
-	))
 }
 
 func (c *cassette) matchEpisode(request *vcrRequest) *episode {
 	if len(c.Episodes) == 0 {
-		panic("VCR: No more episodes!")
+		panic("httpvcr: no more episodes!")
 	}
 
 	e := c.Episodes[0]
@@ -82,4 +75,15 @@ func (c *cassette) matchEpisode(request *vcrRequest) *episode {
 
 	c.Episodes = c.Episodes[1:]
 	return &e
+}
+
+func panicEpisodeMismatch(request *vcrRequest, field string, expected string, actual string) {
+	panic(fmt.Sprintf(
+		"httpvcr: problem with episode for %s %s\n  episode %s does not match:\n  expected: %s\n  but got: %s",
+		request.Method,
+		request.URL,
+		field,
+		expected,
+		actual,
+	))
 }
