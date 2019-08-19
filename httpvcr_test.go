@@ -252,16 +252,16 @@ func TestFileParseError(t *testing.T) {
 	vcr.Stop()
 }
 
-// func TestStartTwice(t *testing.T) {
-// 	testBegin(t)
+func TestStartTwice(t *testing.T) {
+	testBegin(t)
 
-// 	defer func() {
-// 		assert.Equal(t, recover(), "httpvcr: session already started!")
-// 	}()
+	defer func() {
+		assert.Equal(t, recover(), "httpvcr: session already started!")
+	}()
 
-// 	vcr := New("test")
-// 	vcr.Start()
-// 	vcr.Start()
+	vcr := New("test")
+	vcr.Start(context.Background())
+	vcr.Start(context.Background())
 
-// 	vcr.Stop()
-// }
+	vcr.Stop()
+}
