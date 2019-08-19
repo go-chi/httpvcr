@@ -1,4 +1,4 @@
-package vcr
+package httpvcr
 
 import (
 	"bytes"
