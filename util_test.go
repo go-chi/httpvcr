@@ -6,33 +6,33 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestModifyHTTPRequestBody(t *testing.T) {
 	req, err := http.NewRequest("GET", "/", bytes.NewBufferString("abc"))
-	require.Nil(t, err)
-	require.Equal(t, int64(3), req.ContentLength)
+	assert.Nil(t, err)
+	assert.Equal(t, int64(3), req.ContentLength)
 
 	ModifyHTTPRequestBody(req, func(input string) string {
-		require.Equal(t, input, "abc")
+		assert.Equal(t, input, "abc")
 		return "foofoo"
 	})
 
-	require.Equal(t, int64(6), req.ContentLength)
+	assert.Equal(t, int64(6), req.ContentLength)
 	body, _ := ioutil.ReadAll(req.Body)
-	require.Equal(t, "foofoo", string(body))
+	assert.Equal(t, "foofoo", string(body))
 }
 
 func TestModifyHTTPRequestBodyWithNilBody(t *testing.T) {
 	req, err := http.NewRequest("GET", "/", nil)
-	require.Nil(t, err)
-	require.Equal(t, int64(0), req.ContentLength)
+	assert.Nil(t, err)
+	assert.Equal(t, int64(0), req.ContentLength)
 
 	ModifyHTTPRequestBody(req, func(input string) string {
 		return "foofoo"
 	})
 
-	require.Equal(t, int64(0), req.ContentLength)
-	require.Equal(t, req.Body, nil)
+	assert.Equal(t, int64(0), req.ContentLength)
+	assert.Equal(t, req.Body, nil)
 }

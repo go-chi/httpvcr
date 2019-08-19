@@ -1,6 +1,8 @@
 package httpvcr
 
-import "net/http"
+import (
+	"net/http"
+)
 
 type Mode uint32
 
@@ -48,6 +50,9 @@ func New(cassetteName string, opts ...Options) *HTTPVCR {
 	}
 }
 
+// Start starts a VCR session with the given cassette name.
+// Records episodes if the cassette file does not exists.
+// Otherwise plays back recorded episodes.
 func (v *HTTPVCR) Start() {
 	if v.mode != ModeStopped {
 		panic("httpvcr: session already started!")
@@ -66,20 +71,26 @@ func (v *HTTPVCR) Start() {
 	}
 }
 
+// Stop stops the VCR session and writes the cassette file (when recording)
 func (v *HTTPVCR) Stop() {
 	if v.mode == ModeRecord {
 		v.Cassette.write()
 	}
-	// TODO: what happens if we stop then start again?
-	v.mode = ModeStopped
 
-	if v.options.HTTPDefaultOverride {
+	if v.options.HTTPDefaultOverride { //&& v.originalTransport != nil {
 		http.DefaultTransport = v.originalTransport
 	}
+
+	v.mode = ModeStopped
 }
 
 func (v *HTTPVCR) Mode() Mode {
-	return v.Mode()
+	return v.mode
+}
+
+// FilterData allows replacement of sensitive data with a dummy-string
+func (v *HTTPVCR) FilterResponseBody(original string, replacement string) {
+	v.FilterMap[original] = replacement
 }
 
 func (v *HTTPVCR) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -103,6 +114,7 @@ func (v *HTTPVCR) RoundTrip(request *http.Request) (*http.Response, error) {
 
 		e := episode{Request: vcrReq, Response: vcrRes}
 		v.Cassette.Episodes = append(v.Cassette.Episodes, e)
+
 	} else {
 		e := v.Cassette.matchEpisode(vcrReq)
 		vcrRes = e.Response
