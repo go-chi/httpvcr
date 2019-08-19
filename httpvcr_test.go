@@ -91,7 +91,7 @@ func testServer() *httptest.Server {
 	}))
 }
 
-func requestMod(request *http.Request) {
+func requestMod(mode Mode, request *http.Request) {
 	if request.URL.Path == "/modme" {
 		ModifyHTTPRequestBody(request, func(body string) string {
 			return strings.Replace(string(body), "Hey Buddy", "moddedString", 1)
@@ -107,7 +107,7 @@ func TestVCR(t *testing.T) {
 
 	vcr := New("test_cassette")
 	vcr.FilterResponseBody("secret-key", "dummy-key")
-	vcr.RequestModifier = requestMod
+	vcr.BeforeRequest = requestMod
 
 	vcr.Start(context.Background())
 	assert.Equal(t, ModeRecord, vcr.Mode())
