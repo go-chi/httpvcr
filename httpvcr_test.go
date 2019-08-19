@@ -2,6 +2,7 @@ package httpvcr
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
@@ -108,7 +109,7 @@ func TestVCR(t *testing.T) {
 	vcr.FilterResponseBody("secret-key", "dummy-key")
 	vcr.RequestModifier = requestMod
 
-	vcr.Start()
+	vcr.Start(context.Background())
 	assert.Equal(t, ModeRecord, vcr.Mode())
 	testAllRequests(t, ts.URL)
 	vcr.Stop()
@@ -119,7 +120,7 @@ func TestVCR(t *testing.T) {
 	assert.Contains(t, string(data), base64.StdEncoding.EncodeToString([]byte("dummy-key")))
 	assert.NotContains(t, string(data), base64.StdEncoding.EncodeToString([]byte("secret-key")))
 
-	vcr.Start()
+	vcr.Start(context.Background())
 	assert.Equal(t, ModeReplay, vcr.Mode())
 	testAllRequests(t, ts.URL)
 	vcr.Stop()
@@ -143,10 +144,10 @@ func TestNoEpisodesLeft(t *testing.T) {
 	}()
 
 	vcr := New("test_cassette")
-	vcr.Start()
+	vcr.Start(context.Background())
 	vcr.Stop()
 
-	vcr.Start()
+	vcr.Start(context.Background())
 	defer vcr.Stop()
 	testRequest(t, "http://1.2.3.4", nil)
 }
@@ -159,14 +160,14 @@ func TestEpisodesDoNotMatch(t *testing.T) {
 
 	vcr := New("test_cassette")
 	assert.Equal(t, ModeStopped, vcr.Mode())
-	vcr.Start()
+	vcr.Start(context.Background())
 	assert.Equal(t, ModeRecord, vcr.Mode())
 	testRequest(t, ts.URL, nil)
 	vcr.Stop()
 
 	// Method mismatch
 	func() {
-		vcr.Start()
+		vcr.Start(context.Background())
 		defer vcr.Stop()
 
 		defer func() {
@@ -184,7 +185,7 @@ func TestEpisodesDoNotMatch(t *testing.T) {
 			assert.Equal(t, fmt.Sprintf("httpvcr: problem with episode for GET %s\n  episode URL does not match:\n  expected: %v\n  but got: %v", otherURL, ts.URL, otherURL), recover())
 		}()
 
-		vcr.Start()
+		vcr.Start(context.Background())
 		defer vcr.Stop()
 		testRequest(t, otherURL, nil)
 	}()
@@ -198,11 +199,11 @@ func TestEpisodesDoNotMatch(t *testing.T) {
 
 		vcr = New("test_cassette2")
 
-		vcr.Start()
+		vcr.Start(context.Background())
 		testRequest(t, ts.URL, &body)
 		vcr.Stop()
 
-		vcr.Start()
+		vcr.Start(context.Background())
 		defer vcr.Stop()
 		body = "bar"
 		testRequest(t, ts.URL, &body)
@@ -213,7 +214,7 @@ func TestOriginalRoundTripErrors(t *testing.T) {
 	testBegin(t)
 
 	vcr := New("test_cassette")
-	vcr.Start()
+	vcr.Start(context.Background())
 	defer vcr.Stop()
 
 	_, err := http.Get("xhttp://foo")
@@ -228,7 +229,7 @@ func TestFileWriteError(t *testing.T) {
 	}()
 
 	vcr := New("test")
-	vcr.Start()
+	vcr.Start(context.Background())
 	defer vcr.Stop()
 
 	err := os.MkdirAll("fixtures/vcr/test.json", 0755)
@@ -247,7 +248,7 @@ func TestFileParseError(t *testing.T) {
 	assert.Nil(t, err)
 
 	vcr := New("test")
-	vcr.Start()
+	vcr.Start(context.Background())
 	vcr.Stop()
 }
 
