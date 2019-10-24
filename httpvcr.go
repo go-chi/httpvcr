@@ -33,6 +33,9 @@ type VCR struct {
 	mu sync.Mutex
 }
 
+// VCR is a http.RoundTripper and can be used in http clients as such
+var _ http.RoundTripper = &VCR{}
+
 type Options struct {
 	HTTPDefaultOverride bool
 }
