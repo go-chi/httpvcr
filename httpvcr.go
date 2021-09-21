@@ -2,10 +2,9 @@ package httpvcr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
-
-	"github.com/pkg/errors"
 )
 
 type Mode uint32
@@ -38,10 +37,12 @@ var _ http.RoundTripper = &VCR{}
 
 type Options struct {
 	HTTPDefaultOverride bool
+	GZipCassette        bool
 }
 
 var DefaultOptions = Options{
 	HTTPDefaultOverride: true,
+	GZipCassette:        false,
 }
 
 func New(cassetteName string, opts ...Options) *VCR {
@@ -53,7 +54,7 @@ func New(cassetteName string, opts ...Options) *VCR {
 	return &VCR{
 		options:   options,
 		mode:      ModeStopped,
-		Cassette:  &cassette{name: cassetteName},
+		Cassette:  &cassette{name: cassetteName, Gzip: options.GZipCassette},
 		FilterMap: make(map[string]string),
 	}
 }
@@ -120,7 +121,7 @@ func (v *VCR) FilterResponseBody(original string, replacement string) {
 
 func (v *VCR) RoundTrip(request *http.Request) (*http.Response, error) {
 	if v.ctx.Err() == context.Canceled {
-		return nil, errors.Errorf("httpvcr: stopped")
+		return nil, fmt.Errorf("httpvcr: stopped")
 	}
 
 	if v.mode == ModeStopped {

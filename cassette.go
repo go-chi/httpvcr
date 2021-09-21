@@ -2,8 +2,10 @@ package httpvcr
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -12,6 +14,7 @@ import (
 type cassette struct {
 	name     string
 	Episodes []episode
+	Gzip     bool
 }
 
 type episode struct {
@@ -24,7 +27,11 @@ func (c *cassette) Name() string {
 }
 
 func (c *cassette) Filename() string {
-	return "fixtures/vcr/" + c.name + ".json"
+	if c.Gzip {
+		return "fixtures/vcr/" + c.name + ".json.gz"
+	} else {
+		return "fixtures/vcr/" + c.name + ".json"
+	}
 }
 
 func (c *cassette) Exists() bool {
@@ -33,7 +40,21 @@ func (c *cassette) Exists() bool {
 }
 
 func (c *cassette) read() {
-	jsonData, _ := ioutil.ReadFile(c.Filename())
+	var fileData, jsonData []byte
+
+	fileData, _ = ioutil.ReadFile(c.Filename())
+
+	if c.Gzip {
+		var data bytes.Buffer
+		err := gunzipWrite(&data, fileData)
+		if err != nil {
+			panic("httpvcr: gzip read failed")
+		}
+		jsonData = data.Bytes()
+	} else {
+		jsonData = fileData
+	}
+
 	err := json.Unmarshal(jsonData, c)
 	if err != nil {
 		panic("httpvcr: cannot parse json!")
@@ -47,7 +68,19 @@ func (c *cassette) write() {
 	json.Indent(&jsonOut, jsonData, "", "  ")
 
 	os.MkdirAll("fixtures/vcr", 0755)
-	err := ioutil.WriteFile(c.Filename(), jsonOut.Bytes(), 0644)
+
+	var fileOut bytes.Buffer
+
+	if c.Gzip {
+		err := gzipWrite(&fileOut, jsonOut.Bytes())
+		if err != nil {
+			panic("httpvcr: gzip write failed")
+		}
+	} else {
+		fileOut = jsonOut
+	}
+
+	err := ioutil.WriteFile(c.Filename(), fileOut.Bytes(), 0644)
 	if err != nil {
 		panic("httpvcr: cannot write cassette file!")
 	}
@@ -86,4 +119,26 @@ func panicEpisodeMismatch(request *vcrRequest, field string, expected string, ac
 		expected,
 		actual,
 	))
+}
+
+// Write gzipped data to a Writer
+func gzipWrite(w io.Writer, data []byte) error {
+	// Write gzipped data to the client
+	gw, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
+	defer gw.Close()
+	gw.Write(data)
+	return err
+}
+
+// Write gunzipped data to a Writer
+func gunzipWrite(w io.Writer, data []byte) error {
+	// Write gzipped data to the client
+	gr, err := gzip.NewReader(bytes.NewBuffer(data))
+	defer gr.Close()
+	data, err = ioutil.ReadAll(gr)
+	if err != nil {
+		return err
+	}
+	w.Write(data)
+	return nil
 }

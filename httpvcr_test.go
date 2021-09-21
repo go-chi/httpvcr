@@ -218,7 +218,7 @@ func TestOriginalRoundTripErrors(t *testing.T) {
 	defer vcr.Stop()
 
 	_, err := http.Get("xhttp://foo")
-	assert.EqualError(t, err, "Get xhttp://foo: unsupported protocol scheme \"xhttp\"")
+	assert.EqualError(t, err, "Get \"xhttp://foo\": unsupported protocol scheme \"xhttp\"")
 }
 
 func TestFileWriteError(t *testing.T) {
