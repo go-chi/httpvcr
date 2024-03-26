@@ -11,15 +11,53 @@ import (
 	"reflect"
 )
 
-type cassette struct {
-	name     string
-	Episodes []episode
-	Gzip     bool
+type EpisodeMatcher interface {
+	Init(episodes []Episode)
+	MatchEpisode(request *VCRRequest) (*Episode, error)
 }
 
-type episode struct {
-	Request  *vcrRequest
-	Response *vcrResponse
+type DefaultEpisodeMatcher struct {
+	episodes []Episode
+}
+
+func (m *DefaultEpisodeMatcher) Init(episodes []Episode) {
+	m.episodes = episodes
+}
+
+func (m *DefaultEpisodeMatcher) MatchEpisode(request *VCRRequest) (*Episode, error) {
+	if len(m.episodes) == 0 {
+		panic("httpvcr: no more episodes!")
+	}
+
+	e := m.episodes[0]
+	expected := e.Request
+
+	if expected.Method != request.Method {
+		panicEpisodeMismatch(request, "Method", expected.Method, request.Method)
+	}
+
+	if expected.URL != request.URL {
+		panicEpisodeMismatch(request, "URL", expected.URL, request.URL)
+	}
+
+	if !reflect.DeepEqual(expected.Body, request.Body) {
+		panicEpisodeMismatch(request, "Body", string(expected.Body[:]), string(request.Body[:]))
+	}
+
+	m.episodes = m.episodes[1:]
+	return &e, nil
+}
+
+type cassette struct {
+	name           string
+	Episodes       []Episode
+	Gzip           bool
+	episodeMatcher EpisodeMatcher
+}
+
+type Episode struct {
+	Request  *VCRRequest
+	Response *VCRResponse
 }
 
 func (c *cassette) Name() string {
@@ -59,6 +97,7 @@ func (c *cassette) read() {
 	if err != nil {
 		panic("httpvcr: cannot parse json!")
 	}
+	c.episodeMatcher.Init(c.Episodes)
 }
 
 func (c *cassette) write() {
@@ -86,31 +125,11 @@ func (c *cassette) write() {
 	}
 }
 
-func (c *cassette) matchEpisode(request *vcrRequest) *episode {
-	if len(c.Episodes) == 0 {
-		panic("httpvcr: no more episodes!")
-	}
-
-	e := c.Episodes[0]
-	expected := e.Request
-
-	if expected.Method != request.Method {
-		panicEpisodeMismatch(request, "Method", expected.Method, request.Method)
-	}
-
-	if expected.URL != request.URL {
-		panicEpisodeMismatch(request, "URL", expected.URL, request.URL)
-	}
-
-	if !reflect.DeepEqual(expected.Body, request.Body) {
-		panicEpisodeMismatch(request, "Body", string(expected.Body[:]), string(request.Body[:]))
-	}
-
-	c.Episodes = c.Episodes[1:]
-	return &e
+func (c *cassette) matchEpisode(request *VCRRequest) (*Episode, error) {
+	return c.episodeMatcher.MatchEpisode(request)
 }
 
-func panicEpisodeMismatch(request *vcrRequest, field string, expected string, actual string) {
+func panicEpisodeMismatch(request *VCRRequest, field string, expected string, actual string) {
 	panic(fmt.Sprintf(
 		"httpvcr: problem with episode for %s %s\n  episode %s does not match:\n  expected: %s\n  but got: %s",
 		request.Method,

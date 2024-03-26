@@ -36,13 +36,15 @@ type VCR struct {
 var _ http.RoundTripper = &VCR{}
 
 type Options struct {
-	HTTPDefaultOverride bool
-	GZipCassette        bool
+	HTTPDefaultOverride  bool
+	GZipCassette         bool
+	CustomEpisodeMatcher EpisodeMatcher
 }
 
 var DefaultOptions = Options{
-	HTTPDefaultOverride: true,
-	GZipCassette:        false,
+	HTTPDefaultOverride:  true,
+	GZipCassette:         false,
+	CustomEpisodeMatcher: &DefaultEpisodeMatcher{},
 }
 
 func New(cassetteName string, opts ...Options) *VCR {
@@ -51,10 +53,17 @@ func New(cassetteName string, opts ...Options) *VCR {
 		options = opts[0]
 	}
 
+	if options.CustomEpisodeMatcher == nil {
+		options.CustomEpisodeMatcher = &DefaultEpisodeMatcher{}
+	}
+
 	return &VCR{
-		options:   options,
-		mode:      ModeStopped,
-		Cassette:  &cassette{name: cassetteName, Gzip: options.GZipCassette},
+		options: options,
+		mode:    ModeStopped,
+		Cassette: &cassette{name: cassetteName,
+			Gzip:           options.GZipCassette,
+			episodeMatcher: options.CustomEpisodeMatcher,
+		},
 		FilterMap: make(map[string]string),
 	}
 }
@@ -129,7 +138,7 @@ func (v *VCR) RoundTrip(request *http.Request) (*http.Response, error) {
 	}
 
 	vcrReq := newVCRRequest(request, v.FilterMap)
-	var vcrRes *vcrResponse
+	var vcrRes *VCRResponse
 
 	if v.BeforeRequest != nil {
 		v.BeforeRequest(v.mode, request)
@@ -147,15 +156,17 @@ func (v *VCR) RoundTrip(request *http.Request) (*http.Response, error) {
 			vcrReq.URL = v.URLRewriter(vcrReq.URL)
 		}
 
-		e := episode{Request: vcrReq, Response: vcrRes}
+		e := Episode{Request: vcrReq, Response: vcrRes}
 		v.Cassette.Episodes = append(v.Cassette.Episodes, e)
-
 	} else {
 		if v.URLRewriter != nil {
 			vcrReq.URL = v.URLRewriter(vcrReq.URL)
 		}
 
-		e := v.Cassette.matchEpisode(vcrReq)
+		e, err := v.Cassette.matchEpisode(vcrReq)
+		if err != nil {
+			return nil, err
+		}
 		vcrRes = e.Response
 	}
 

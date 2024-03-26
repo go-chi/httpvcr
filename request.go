@@ -6,14 +6,14 @@ import (
 	"net/http"
 )
 
-type vcrRequest struct {
+type VCRRequest struct {
 	// Header is intentionally not included and is not used for episode matching
 	Method string
 	URL    string
 	Body   []byte
 }
 
-func newVCRRequest(request *http.Request, filterMap map[string]string) *vcrRequest {
+func newVCRRequest(request *http.Request, filterMap map[string]string) *VCRRequest {
 	var body []byte
 	if request.Body != nil {
 		body, _ = ioutil.ReadAll(request.Body)
@@ -25,7 +25,7 @@ func newVCRRequest(request *http.Request, filterMap map[string]string) *vcrReque
 		}
 	}
 
-	return &vcrRequest{
+	return &VCRRequest{
 		Method: request.Method,
 		URL:    request.URL.String(),
 		Body:   body,
