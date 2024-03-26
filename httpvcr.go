@@ -36,15 +36,15 @@ type VCR struct {
 var _ http.RoundTripper = &VCR{}
 
 type Options struct {
-	HTTPDefaultOverride  bool
-	GZipCassette         bool
-	CustomEpisodeMatcher EpisodeMatcher
+	HTTPDefaultOverride bool
+	GZipCassette        bool
+	EpisodeMatcher      EpisodeMatcher
 }
 
 var DefaultOptions = Options{
-	HTTPDefaultOverride:  true,
-	GZipCassette:         false,
-	CustomEpisodeMatcher: &DefaultEpisodeMatcher{},
+	HTTPDefaultOverride: true,
+	GZipCassette:        false,
+	EpisodeMatcher:      &DefaultEpisodeMatcher{},
 }
 
 func New(cassetteName string, opts ...Options) *VCR {
@@ -53,8 +53,8 @@ func New(cassetteName string, opts ...Options) *VCR {
 		options = opts[0]
 	}
 
-	if options.CustomEpisodeMatcher == nil {
-		options.CustomEpisodeMatcher = &DefaultEpisodeMatcher{}
+	if options.EpisodeMatcher == nil {
+		options.EpisodeMatcher = &DefaultEpisodeMatcher{}
 	}
 
 	return &VCR{
@@ -62,7 +62,7 @@ func New(cassetteName string, opts ...Options) *VCR {
 		mode:    ModeStopped,
 		Cassette: &cassette{name: cassetteName,
 			Gzip:           options.GZipCassette,
-			episodeMatcher: options.CustomEpisodeMatcher,
+			episodeMatcher: options.EpisodeMatcher,
 		},
 		FilterMap: make(map[string]string),
 	}
