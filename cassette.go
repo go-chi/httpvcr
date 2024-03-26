@@ -14,6 +14,7 @@ import (
 type EpisodeMatcher interface {
 	Init(episodes []Episode)
 	MatchEpisode(request *VCRRequest) (*Episode, error)
+	Stop()
 }
 
 type DefaultEpisodeMatcher struct {
@@ -46,6 +47,10 @@ func (m *DefaultEpisodeMatcher) MatchEpisode(request *VCRRequest) (*Episode, err
 
 	m.episodes = m.episodes[1:]
 	return &e, nil
+}
+
+func (m *DefaultEpisodeMatcher) Stop() {
+	// no-op
 }
 
 type cassette struct {

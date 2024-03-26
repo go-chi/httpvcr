@@ -112,6 +112,7 @@ func (v *VCR) Stop() {
 	}
 
 	v.mode = ModeStopped
+	v.Cassette.episodeMatcher.Stop()
 	v.ctxCancel()
 }
 
