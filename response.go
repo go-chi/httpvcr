@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-type vcrResponse struct {
+type VCRResponse struct {
 	Status        string
 	StatusCode    int
 	ContentLength int64
@@ -14,13 +14,13 @@ type vcrResponse struct {
 	Body          []byte
 }
 
-func newVCRResponse(response *http.Response) *vcrResponse {
+func newVCRResponse(response *http.Response) *VCRResponse {
 	var body []byte
 	if response.Body != nil {
 		body, _ = ioutil.ReadAll(response.Body)
 	}
 
-	return &vcrResponse{
+	return &VCRResponse{
 		Status:        response.Status,
 		StatusCode:    response.StatusCode,
 		Header:        response.Header,
@@ -29,7 +29,7 @@ func newVCRResponse(response *http.Response) *vcrResponse {
 	}
 }
 
-func (vr *vcrResponse) httpResponse() *http.Response {
+func (vr *VCRResponse) httpResponse() *http.Response {
 	return &http.Response{
 		Status:        vr.Status,
 		StatusCode:    vr.StatusCode,
